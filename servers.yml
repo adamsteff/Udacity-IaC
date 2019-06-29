@@ -8,6 +8,10 @@ Parameters:
     DNSProtocol:
         Description: An DNS protocol that will be prefixed to resources
         Type: String
+    NetworkAccessIP:
+        Description: Source that has SSH access to the bastion host. (i.e. 50.32.108.38/32)
+        Type: String
+        Default: 0.0.0.0/0
 Resources:
   LBSecGroup:
     Type: AWS::EC2::SecurityGroup
@@ -62,7 +66,7 @@ Resources:
           unzip -o nbn_protecting_20190620_163522_open.zip
       ImageId: ami-005bdb005fb00e791
       KeyName: 'gurootraining'
-      IamInstanceProfile: 'EC2_S3_FullAccess'
+      IamInstanceProfile: !Ref IamInstanceProfile
       SecurityGroups:
       - Ref: WebServerSecGroup
       InstanceType: t3.small
@@ -126,6 +130,97 @@ Resources:
       VpcId:
         Fn::ImportValue:
           !Sub "${EnvironmentName}-VPCID"
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+  IamPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: root
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action: "s3:*"
+          Resource: "*"
+      Roles:
+      - !Ref IamRole
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref IamRole
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SSH Access to Bastion Instance
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${EnvironmentName}-VPCID"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: !Sub ${NetworkAccessIP}
+      - IpProtocol: icmp
+        FromPort: "-1"
+        ToPort: "-1"
+        CidrIp: !Sub ${NetworkAccessIP}
+      SecurityGroupEgress:
+      - IpProtocol: "-1"
+        CidrIp: 0.0.0.0/0
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+    - BastionSecurityGroup
+    - IamInstanceProfile
+    Properties:
+      IamInstanceProfile: !Ref IamInstanceProfile
+      ImageId: ami-005bdb005fb00e791
+      InstanceType: t3.small
+      KeyName: 'gurootraining'
+      SecurityGroupIds:
+      - Ref: BastionSecurityGroup
+      - Ref: WebServerSecGroup
+      SubnetId: 
+        Fn::ImportValue: 
+          !Sub "${EnvironmentName}-PUB1-SN"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          warmebs: 'echo ''ACTION: Performing EBS Warming'' && dd if=/dev/xvda of=/dev/xvdaconv=notrunc bs=1M status=progress'
+          installpackagelist: 'apt-get update && apt-get install '
+          - Ref: AWS::NoValue
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: 
+        Fn::ImportValue:
+          !Sub "${EnvironmentName}-VPCID"
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    DependsOn:
+    - EC2Instance
+    - EIP
+    Properties:
+      InstanceId:
+        Ref: EC2Instance
+      AllocationId:
+        Fn::GetAtt:
+        - EIP
+        - AllocationId
+
 Outputs:
   WebAppLB:
     Description: A reference to the Loadbalancer DNS Name
