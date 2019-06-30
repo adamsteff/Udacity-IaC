@@ -4,12 +4,8 @@
     "ParameterValue": "UdacityProject"
     },
     {
-    "ParameterKey": "DNSProtocol",
-    "ParameterValue": "http://"
-    },
-    {
     "ParameterKey": "NetworkAccessIP",
-    "ParameterValue": "0.0.0.0/0"
+    "ParameterValue": "144.136.32.11/32"
     },
     {
     "ParameterKey": "BastionHostSSHKeyName",

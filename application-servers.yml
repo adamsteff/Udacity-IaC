@@ -7,13 +7,7 @@ Parameters:
         Type: String
     DNSProtocol:
         Description: An DNS protocol that will be prefixed to resources
-        Type: String
-    NetworkAccessIP:
-        Description: Source that has SSH access to the bastion host. (i.e. 50.32.108.38/32)
-        Type: String
-    BastionHostSSHKeyName:
-        Description: Bastion Host SSH Key Name
-        Type: String
+        Type: String 
 Resources:
   LBSecGroup:
     Type: AWS::EC2::SecurityGroup
@@ -47,7 +41,9 @@ Resources:
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
-        CidrIp: 0.0.0.0/0
+        CidrIp: 
+          Fn::ImportValue:
+            !Sub ${EnvironmentName}-BASTION-HOST-CIDR
       SecurityGroupEgress:
       - IpProtocol: tcp
         FromPort: 0
@@ -67,7 +63,9 @@ Resources:
           aws s3 cp s3://udacity-protecting-personal-information/nbn_protecting_20190620_163522_open.zip /var/www/html
           unzip -o nbn_protecting_20190620_163522_open.zip
       ImageId: ami-005bdb005fb00e791
-      KeyName: !Sub ${BastionHostSSHKeyName}
+      KeyName:
+        Fn::ImportValue:
+            !Sub ${EnvironmentName}-BASTION-HOST-SSH-KEY-NAME
       IamInstanceProfile: !Ref IamInstanceProfile
       SecurityGroups:
       - Ref: WebServerSecGroup
@@ -163,81 +161,7 @@ Resources:
       Path: "/"
       Roles:
       - !Ref IamRole
-  BastionSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: SSH Access to Bastion Instance
-      VpcId:
-        Fn::ImportValue:
-          !Sub "${EnvironmentName}-VPCID"
-      SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: '22'
-        ToPort: '22'
-        CidrIp: !Sub ${NetworkAccessIP}
-      - IpProtocol: icmp
-        FromPort: "-1"
-        ToPort: "-1"
-        CidrIp: !Sub ${NetworkAccessIP}
-      SecurityGroupEgress:
-      - IpProtocol: "-1"
-        CidrIp: 0.0.0.0/0
-  BastionEC2Instance:
-    Type: AWS::EC2::Instance
-    DependsOn:
-    - BastionSecurityGroup
-    - IamInstanceProfile
-    Properties:
-      IamInstanceProfile: !Ref IamInstanceProfile
-      ImageId: ami-005bdb005fb00e791
-      InstanceType: t3.small
-      KeyName: !Sub ${BastionHostSSHKeyName}
-      SecurityGroupIds:
-      - Ref: BastionSecurityGroup
-      - Ref: WebServerSecGroup
-      SubnetId: 
-        Fn::ImportValue: 
-          !Sub "${EnvironmentName}-PUB1-SN"
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          apt-get update -y
-          apt-get install unzip awscli -y
-          cd /home/ubuntu
-          aws s3 cp s3://udacity-gurootraining-keys/gurootraining.pem /home/ubuntu
-          chmod 400 gurootraining.pem
-          warmebs: 'echo ''ACTION: Performing EBS Warming'' && dd if=/dev/xvda of=/dev/xvdaconv=notrunc bs=1M status=progress'
-          installpackagelist: 'apt-get update && apt-get install '
-          - Ref: AWS::NoValue
-  EIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: 
-        Fn::ImportValue:
-          !Sub "${EnvironmentName}-VPCID"
-  EIPAssociation:
-    Type: AWS::EC2::EIPAssociation
-    DependsOn:
-    - BastionEC2Instance
-    - EIP
-    Properties:
-      InstanceId:
-        Ref: BastionEC2Instance
-      AllocationId:
-        Fn::GetAtt:
-        - EIP
-        - AllocationId
-
 Outputs:
-  WebAppLB:
-    Description: A reference to the Loadbalancer DNS Name
-    Value: 
-      !Join
-      - ''
-      - - !Sub ${DNSProtocol}
-        - !GetAtt WebAppLB.DNSName
-    Export:
-        Name: !Sub ${EnvironmentName}-LOADBALANCER-DNS
   WebAppLB:
     Description: A reference to the Loadbalancer DNS Name
     Value: 

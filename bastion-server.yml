@@ -1,0 +1,116 @@
+Description: >
+  Adam Steff / Udacity
+  This template deploys a Bastion Server.
+Parameters:
+    EnvironmentName:
+        Description: An Environment name that will be prefixed to resources
+        Type: String
+    NetworkAccessIP:
+        Description: Source that has SSH access to the bastion host. (i.e. 50.32.108.38/32)
+        Type: String
+    BastionHostSSHKeyName:
+        Description: Bastion Host SSH Key Name
+        Type: String
+Resources:
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+  IamPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: root
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action: "s3:*"
+          Resource: "*"
+      Roles:
+      - !Ref IamRole
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref IamRole
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SSH Access to Bastion Instance
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${EnvironmentName}-VPCID"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: !Sub ${NetworkAccessIP}
+      SecurityGroupEgress:
+      - IpProtocol: "-1"
+        CidrIp: 0.0.0.0/0
+  BastionEC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+    - BastionSecurityGroup
+    - IamInstanceProfile
+    Properties:
+      IamInstanceProfile: !Ref IamInstanceProfile
+      ImageId: ami-005bdb005fb00e791
+      InstanceType: t3.small
+      KeyName: !Sub ${BastionHostSSHKeyName}
+      SecurityGroupIds:
+      - Ref: BastionSecurityGroup
+      SubnetId: 
+        Fn::ImportValue: 
+          !Sub "${EnvironmentName}-PUB1-SN"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt-get update -y
+          apt-get install unzip awscli -y
+          cd /home/ubuntu
+          aws s3 cp s3://udacity-gurootraining-keys/gurootraining.pem /home/ubuntu
+          chmod 400 gurootraining.pem
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: 
+        Fn::ImportValue:
+          !Sub "${EnvironmentName}-VPCID"
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    DependsOn:
+    - BastionEC2Instance
+    - EIP
+    Properties:
+      InstanceId:
+        Ref: BastionEC2Instance
+      AllocationId:
+        Fn::GetAtt:
+        - EIP
+        - AllocationId
+Outputs:
+  BastionHostCIDR:
+    Description: A reference to the Bastion Host CIDR
+    Value: 
+      !Join
+        - ''
+        - - !GetAtt BastionEC2Instance.PrivateIp
+          - !Sub '/32'
+    Export:
+        Name: !Sub ${EnvironmentName}-BASTION-HOST-CIDR
+  BastionHostSSHKeyName:
+    Description: A reference to the Bastion Host SSH Key Name
+    Value: !Sub ${BastionHostSSHKeyName}
+    Export:
+        Name: !Sub ${EnvironmentName}-BASTION-HOST-SSH-KEY-NAME
