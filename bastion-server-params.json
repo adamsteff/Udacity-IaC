@@ -5,7 +5,7 @@
     },
     {
     "ParameterKey": "NetworkAccessIP",
-    "ParameterValue": "144.136.32.11/32"
+    "ParameterValue": "144.136.38.245/32"
     },
     {
     "ParameterKey": "BastionHostSSHKeyName",
