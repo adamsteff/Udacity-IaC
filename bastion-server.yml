@@ -8,6 +8,9 @@ Parameters:
     NetworkAccessIP:
         Description: Source that has SSH access to the bastion host. (i.e. 50.32.108.38/32)
         Type: String
+    BastionHostSSHS3Bucket:
+        Description: Bucket name for Application
+        Type: String
     BastionHostSSHKeyName:
         Description: Bastion Host SSH Key Name
         Type: 'AWS::EC2::KeyPair::KeyName'
@@ -79,8 +82,8 @@ Resources:
           apt-get update -y
           apt-get install unzip awscli -y
           cd /home/ubuntu
-          aws s3 cp s3://udacity-gurootraining-keys/${BastionHostSSHKeyName}.pem /home/ubuntu
-          chmod 400 gurootraining.pem
+          aws s3 cp s3://${BastionHostSSHS3Bucket}/${BastionHostSSHKeyName}.pem /home/ubuntu
+          chmod 400 ${BastionHostSSHKeyName}.pem
   EIP1:
     Type: AWS::EC2::EIP
     Properties:
@@ -120,8 +123,8 @@ Resources:
           apt-get update -y
           apt-get install unzip awscli -y
           cd /home/ubuntu
-          aws s3 cp s3://udacity-gurootraining-keys/gurootraining.pem /home/ubuntu
-          chmod 400 gurootraining.pem
+          aws s3 cp s3://${BastionHostSSHS3Bucket}/${BastionHostSSHKeyName}.pem /home/ubuntu
+          chmod 400 ${BastionHostSSHKeyName}.pem
   EIP2:
     Type: AWS::EC2::EIP
     Properties:

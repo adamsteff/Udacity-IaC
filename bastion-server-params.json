@@ -8,6 +8,10 @@
     "ParameterValue": "144.136.38.245/32"
     },
     {
+    "ParameterKey": "BastionHostSSHS3Bucket",
+    "ParameterValue": "udacity-gurootraining-keys"
+    },
+    {
     "ParameterKey": "BastionHostSSHKeyName",
     "ParameterValue": "gurootraining"
     }
